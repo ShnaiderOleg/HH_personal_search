@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Дашборд — HHSearch{% endblock %}
+{% block content %}
+<section class="stats">
+  <div class="stat"><span class="stat-num" data-stat="total">–</span><span class="stat-label">Всего вакансий</span></div>
+  <div class="stat"><span class="stat-num" data-stat="favorites">–</span><span class="stat-label">Избранное</span></div>
+  <div class="stat"><span class="stat-num" data-stat="searches">–</span><span class="stat-label">Активных поисков</span></div>
+</section>
+
+<section class="panel">
+  <h2>Новые вакансии за 30 дней</h2>
+  <div id="chart" class="chart"></div>
+</section>
+
+<section class="panel">
+  <h2>Последние найденные вакансии</h2>
+  <table class="table">
+    <thead>
+      <tr><th>Вакансия</th><th>Зарплата</th><th>Компания</th><th>Регион</th><th>Найдена</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for v in recent %}
+      <tr>
+        <td><a href="{{ v.url }}" target="_blank" rel="noopener">{{ v.title }}</a></td>
+        <td>{{ salary_label(v) }}</td>
+        <td>{{ v.employer or '—' }}</td>
+        <td>{{ v.area or '—' }}</td>
+        <td class="muted">{{ v.first_seen_at.strftime('%d.%m %H:%M') }}</td>
+        <td>
+          <button class="fav-btn {{ 'on' if v.is_favorite }}" data-hh-id="{{ v.hh_id }}" title="В избранное">★</button>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="muted">Вакансий пока нет. Настройте поиски или дождитесь поллинга.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Поиски — HHSearch{% endblock %}
+{% block content %}
+<section class="panel">
+  <h2>Новый поиск</h2>
+  <form id="search-form" class="form">
+    <input type="hidden" name="search_id">
+    <div class="form-row">
+      <label>Название
+        <input name="title" required placeholder="Например: Python backend, Москва">
+      </label>
+    </div>
+    <div class="form-row">
+      <label>Поисковый запрос
+        <input name="query" required placeholder="Например: python developer">
+      </label>
+      <span class="muted">Синтаксис hh: пробел = И, фразы в кавычках, OR — «или», NOT слово — исключить.<br>
+        Исключение нескольких слов — повторяйте NOT, а цепочку OR оберните в скобки:<br>
+        <code>("ИТ директор" OR "директор ИТ" OR CIO) NOT продаж NOT менеджер</code></span>
+    </div>
+    <div class="form-row">
+      <label class="check"><input type="checkbox" name="title_only" value="1"> Только в названии вакансии</label>
+    </div>
+    <div class="form-row">
+      <label>Регион
+        <input id="area-input" name="area_input" autocomplete="off" placeholder="Начните вводить город/регион…">
+        <input type="hidden" name="area_id">
+        <input type="hidden" name="area_name">
+        <ul id="area-suggest" class="suggest"></ul>
+      </label>
+    </div>
+    <div class="form-buttons">
+      <button type="submit" class="btn primary" id="search-submit">Добавить поиск</button>
+      <button type="button" class="btn" id="search-cancel" style="display:none">Отмена</button>
+      <span id="form-msg" class="muted"></span>
+    </div>
+  </form>
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <h2>Настроенные поиски</h2>
+    <button class="btn" id="poll-now">Обновить сейчас</button>
+  </div>
+  <span id="poll-msg" class="muted"></span>
+  <table class="table">
+    <thead>
+      <tr><th>Название</th><th>Запрос</th><th>Регион</th><th>Последний запуск</th><th>Ошибка</th><th>Активен</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for s in searches %}
+      <tr>
+        <td>{{ s.title }}</td>
+        <td><code>{{ s.query }}</code>{% if s.title_only %}<span class="muted"> · только название</span>{% endif %}</td>
+        <td>{{ s.area_name or '—' }}</td>
+        <td class="muted">{{ s.last_run_at.strftime('%d.%m %H:%M') if s.last_run_at else '—' }}</td>
+        <td class="error">{{ s.last_error or '' }}</td>
+        <td>
+          <input type="checkbox" class="search-toggle" data-id="{{ s.id }}" {{ 'checked' if s.active }}>
+        </td>
+        <td>
+          <button class="btn search-edit" data-id="{{ s.id }}"
+             data-title="{{ s.title }}" data-query="{{ s.query }}"
+             data-area-id="{{ s.area_id or '' }}" data-area-name="{{ s.area_name or '' }}"
+             data-title-only="{{ '1' if s.title_only else '0' }}">Изменить</button>
+          <button class="btn danger search-delete" data-id="{{ s.id }}">Удалить</button>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="muted">Пока нет ни одного поиска.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

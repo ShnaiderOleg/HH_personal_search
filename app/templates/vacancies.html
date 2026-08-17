@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Вакансии — HHSearch{% endblock %}
+{% block content %}
+<section class="panel">
+  <form method="get" action="/vacancies" class="form inline">
+    <label>Поиск
+      <select name="search_id">
+        <option value="">Все</option>
+        {% for s in searches %}
+        <option value="{{ s.id }}" {{ 'selected' if current_search_id == s.id }}>{{ s.title }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Название содержит
+      <input name="q" value="{{ current_q }}" placeholder="Ключевые слова…">
+    </label>
+    <label>Статус
+      <select name="status">
+        <option value="">Все</option>
+        <option value="{{ EMPTY_STATUS }}" {{ 'selected' if current_status == EMPTY_STATUS }}>с пустым статусом</option>
+        <option value="не интересует" {{ 'selected' if current_status == 'не интересует' }}>не интересует</option>
+        <option value="Отклик" {{ 'selected' if current_status == 'Отклик' }}>Отклик</option>
+        <option value="Отказ" {{ 'selected' if current_status == 'Отказ' }}>Отказ</option>
+      </select>
+    </label>
+    <label class="check"><input type="checkbox" name="favorite" value="1" {{ 'checked' if current_favorite }}> Только избранное</label>
+    <button type="submit" class="btn">Фильтровать</button>
+  </form>
+</section>
+
+<section class="panel">
+  <table class="table">
+    <thead>
+      <tr><th>Вакансия</th><th>Зарплата</th><th>Компания</th><th>Регион</th><th>Найдена</th><th>Статус</th><th>Дата отклика</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for v in vacancies %}
+      <tr>
+        <td><a href="{{ v.url }}" target="_blank" rel="noopener">{{ v.title }}</a></td>
+        <td>{{ salary_label(v) }}</td>
+        <td>{{ v.employer or '—' }}</td>
+        <td>{{ v.area or '—' }}</td>
+        <td class="muted">{{ v.first_seen_at.strftime('%d.%m %H:%M') }}</td>
+        <td>
+          <select class="status-select" data-hh-id="{{ v.hh_id }}">
+            <option value="">—</option>
+            <option value="не интересует" {{ 'selected' if v.status == 'не интересует' }}>не интересует</option>
+            <option value="Отклик" {{ 'selected' if v.status == 'Отклик' }}>Отклик</option>
+            <option value="Отказ" {{ 'selected' if v.status == 'Отказ' }}>Отказ</option>
+          </select>
+        </td>
+        <td class="muted" data-applied="{{ v.hh_id }}">{{ v.applied_at.strftime('%d.%m %H:%M') if v.applied_at else '—' }}</td>
+        <td>
+          <button class="fav-btn {{ 'on' if v.is_favorite }}" data-hh-id="{{ v.hh_id }}" title="В избранное">★</button>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="muted">Ничего не найдено.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

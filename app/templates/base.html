@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}HHSearch{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">HHSearch</div>
+    <nav>
+      <a href="/" class="{% if active_page == 'dashboard' %}active{% endif %}">Дашборд</a>
+      <a href="/searches" class="{% if active_page == 'searches' %}active{% endif %}">Поиски</a>
+      <a href="/vacancies" class="{% if active_page == 'vacancies' %}active{% endif %}">Вакансии</a>
+    </nav>
+  </header>
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
