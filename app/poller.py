@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 PAGE_SIZE = 20
 BLOCKED_COOLDOWN_MINUTES = 60
+BLOCKED_MAX_COOLDOWN_MINUTES = 480
 
 
 class Poller:
@@ -25,6 +26,7 @@ class Poller:
         self._scheduler: AsyncIOScheduler | None = None
         self._running = False
         self._blocked_until: dict[int, datetime] = {}
+        self._block_failures: dict[int, int] = {}
 
     def start(self) -> None:
         self._scheduler = AsyncIOScheduler()
@@ -82,11 +84,22 @@ class Poller:
                 await asyncio.sleep(self.settings.request_delay_seconds)
         except ScraperBlockedError as exc:
             error_msg = f"блокировка: {exc}"
-            self._blocked_until[search.id] = utcnow() + timedelta(minutes=BLOCKED_COOLDOWN_MINUTES)
-            logger.warning("search %s blocked: %s", search.title, exc)
+            fails = self._block_failures.get(search.id, 0) + 1
+            self._block_failures[search.id] = fails
+            cooldown = min(
+                BLOCKED_COOLDOWN_MINUTES * (2 ** (fails - 1)),
+                BLOCKED_MAX_COOLDOWN_MINUTES,
+            )
+            self._blocked_until[search.id] = utcnow() + timedelta(minutes=cooldown)
+            logger.warning(
+                "search %s blocked (%s in a row), cooldown %s min: %s",
+                search.title, fails, cooldown, exc,
+            )
         except Exception as exc:
             error_msg = f"{type(exc).__name__}: {exc}"
             logger.exception("search %s failed", search.title)
+        else:
+            self._block_failures[search.id] = 0
 
         search.last_run_at = utcnow()
         search.last_error = error_msg

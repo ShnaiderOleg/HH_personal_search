@@ -105,9 +105,16 @@ class HHScraper:
         self.settings = settings
         headers = {
             "User-Agent": settings.hh_user_agent,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
             "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
             "Referer": f"{settings.hh_base_url}/",
+            "Sec-Ch-Ua": '"Chromium";v="125", "Google Chrome";v="125", "Not.A/Brand";v="24"',
+            "Sec-Ch-Ua-Mobile": "?0",
+            "Sec-Ch-Ua-Platform": '"Windows"',
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "same-origin",
+            "Upgrade-Insecure-Requests": "1",
         }
         if settings.cookie_header:
             headers["Cookie"] = settings.cookie_header
@@ -141,13 +148,32 @@ class HHScraper:
             raise ScraperBlockedError(f"blocked by hh.ru: HTTP {resp.status_code}")
         resp.raise_for_status()
         if self._looks_blocked(resp.text):
-            raise ScraperBlockedError("captcha/anti-bot page detected")
+            title = self._page_title(resp.text)
+            raise ScraperBlockedError(f"captcha/anti-bot page detected (title: {title!r})")
         return resp.text
 
     @staticmethod
+    def _page_title(html: str) -> str:
+        m = re.search(r"<title[^>]*>(.*?)</title>", html, re.I | re.S)
+        return m.group(1).strip()[:120] if m else ""
+
+    @staticmethod
     def _looks_blocked(html: str) -> bool:
+        """Анти-бот страница: есть её маркеры и нет реальной выдачи hh."""
         low = html.lower()
-        return "captcha" in low and "serp-item" not in low
+        if "serp-item" in low or 'data-qa="vacancy-serp' in low:
+            return False
+        markers = (
+            "captcha",
+            "recaptcha",
+            "verify you are not a robot",
+            "подтвердите, что вы не робот",
+            "подтверди, что ты не робот",
+            "access denied",
+            "доступ ограничен",
+            "forbidden",
+        )
+        return any(m in low for m in markers)
 
     def parse_serp(self, html: str) -> list[VacancyCard]:
         soup = BeautifulSoup(html, "lxml")

@@ -79,3 +79,26 @@ def test_parse_activity_date():
     assert parse_activity_date("3 дня назад", today) == today - timedelta(days=3)
     assert parse_activity_date(None, today) is None
     assert parse_activity_date("з/п", today) is None
+
+
+def test_looks_blocked_true_for_antibot():
+    html = (
+        '<html><title>Проверка</title><body>'
+        'captcha. Подтвердите, что вы не робот'
+        '</body></html>'
+    )
+    assert HHScraper._looks_blocked(html) is True
+
+
+def test_looks_blocked_false_for_real_serp_even_with_captcha_word():
+    html = '<article data-qa="vacancy-serp__vacancy"><a data-qa="serp-item__title" href="/vacancy/1">x</a>captcha</article>'
+    assert HHScraper._looks_blocked(html) is False
+
+
+def test_looks_blocked_false_for_plain_page():
+    assert HHScraper._looks_blocked(SAMPLE_SERP) is False
+
+
+def test_page_title():
+    assert HHScraper._page_title("<html><title>Проверка, что вы не робот</title></html>") == "Проверка, что вы не робот"
+    assert HHScraper._page_title("<html></html>") == ""
