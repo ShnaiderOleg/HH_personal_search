@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from datetime import datetime, timedelta
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
@@ -15,6 +16,7 @@ from .services import vacancy_service
 logger = logging.getLogger(__name__)
 
 PAGE_SIZE = 20
+BLOCKED_COOLDOWN_MINUTES = 60
 
 
 class Poller:
@@ -22,6 +24,7 @@ class Poller:
         self.settings = settings
         self._scheduler: AsyncIOScheduler | None = None
         self._running = False
+        self._blocked_until: dict[int, datetime] = {}
 
     def start(self) -> None:
         self._scheduler = AsyncIOScheduler()
@@ -59,7 +62,11 @@ class Poller:
             self._running = False
 
     async def _process_search(self, scraper: HHScraper, db, search: Search) -> None:
+        now = utcnow()
+        if now < self._blocked_until.get(search.id, now):
+            return
         new_vacancies = []
+        error_msg = None
         try:
             for page in range(self.settings.max_pages):
                 html = await scraper.fetch_serp(
@@ -73,19 +80,17 @@ class Poller:
                 if len(cards) < PAGE_SIZE:
                     break
                 await asyncio.sleep(self.settings.request_delay_seconds)
-            search.last_run_at = utcnow()
-            search.last_error = None
-            db.commit()
         except ScraperBlockedError as exc:
-            search.last_error = f"блокировка: {exc}"
-            db.commit()
+            error_msg = f"блокировка: {exc}"
+            self._blocked_until[search.id] = utcnow() + timedelta(minutes=BLOCKED_COOLDOWN_MINUTES)
             logger.warning("search %s blocked: %s", search.title, exc)
-            return
         except Exception as exc:
-            search.last_error = f"{type(exc).__name__}: {exc}"
-            db.commit()
+            error_msg = f"{type(exc).__name__}: {exc}"
             logger.exception("search %s failed", search.title)
-            return
+
+        search.last_run_at = utcnow()
+        search.last_error = error_msg
+        db.commit()
 
         if new_vacancies:
             await self._notify(new_vacancies)
