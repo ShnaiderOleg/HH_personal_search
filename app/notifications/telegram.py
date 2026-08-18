@@ -21,6 +21,8 @@ def _card(vacancy: Vacancy) -> str:
         parts.append(f"\U0001f3e2 {html.escape(vacancy.employer)}")
     if vacancy.area:
         parts.append(f"\U0001f4cd {html.escape(vacancy.area)}")
+    if vacancy.match_score is not None:
+        parts.append(f"\U0001f3af Оценка соответствия: {vacancy.match_score}/5")
     parts.append(f"\U0001f517 <a href=\"{html.escape(vacancy.url)}\">Открыть вакансию</a>")
     return "\n".join(parts)
 
