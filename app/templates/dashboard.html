@@ -25,7 +25,7 @@
         <td>{{ salary_label(v) }}</td>
         <td>{{ v.employer or '—' }}</td>
         <td>{{ v.area or '—' }}</td>
-        <td class="muted">{{ v.first_seen_at.strftime('%d.%m %H:%M') }}</td>
+        <td class="muted">{{ fmt_dt(v.first_seen_at) }}</td>
         <td>
           <button class="fav-btn {{ 'on' if v.is_favorite }}" data-hh-id="{{ v.hh_id }}" title="В избранное">★</button>
         </td>

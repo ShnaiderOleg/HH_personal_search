@@ -1,5 +1,6 @@
 import asyncio
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -12,6 +13,7 @@ from ..models import EMPTY_STATUS, Search, SearchVacancy, Vacancy, utcnow
 from ..notifications import telegram as telegram_notifier
 from ..services.vacancy_service import salary_label
 from ..state import get_poller
+from ..timeutil import ensure_utc
 from .. import areas as areas_service
 
 router = APIRouter()
@@ -42,8 +44,8 @@ def _search_out(search: Search) -> dict:
         "area_name": search.area_name,
         "title_only": search.title_only,
         "active": search.active,
-        "created_at": search.created_at,
-        "last_run_at": search.last_run_at,
+        "created_at": ensure_utc(search.created_at),
+        "last_run_at": ensure_utc(search.last_run_at),
         "last_error": search.last_error,
     }
 
@@ -61,10 +63,10 @@ def _vacancy_out(vacancy: Vacancy, search_ids: list[int] | None = None) -> dict:
         "employer": vacancy.employer,
         "area": vacancy.area,
         "experience": vacancy.experience,
-        "first_seen_at": vacancy.first_seen_at,
+        "first_seen_at": ensure_utc(vacancy.first_seen_at),
         "is_favorite": vacancy.is_favorite,
         "status": vacancy.status,
-        "applied_at": vacancy.applied_at,
+        "applied_at": ensure_utc(vacancy.applied_at),
         "search_ids": search_ids or [],
     }
 
@@ -218,6 +220,8 @@ def areas(q: str = Query("", max_length=100)):
 
 @router.get("/stats")
 def stats(days: int = Query(30, ge=1, le=365), db: Session = Depends(get_session)):
+    settings = get_settings()
+    tz = ZoneInfo(settings.app_timezone)
     since = datetime.now(timezone.utc) - timedelta(days=days)
     rows = (
         db.query(func.date(Vacancy.first_seen_at), func.count(Vacancy.id))
@@ -227,8 +231,9 @@ def stats(days: int = Query(30, ge=1, le=365), db: Session = Depends(get_session
     )
     counts = {str(day): cnt for day, cnt in rows}
     result = []
+    today = datetime.now(tz).date()
     for i in range(days - 1, -1, -1):
-        day = (date.today() - timedelta(days=i)).isoformat()
+        day = (today - timedelta(days=i)).isoformat()
         result.append({"date": day, "count": counts.get(day, 0)})
     return {
         "days": result,

@@ -7,14 +7,17 @@ from pathlib import Path
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from ..config import get_settings
 from ..db import get_session
 from ..models import EMPTY_STATUS, Search, Vacancy
 from ..services.vacancy_service import salary_label
+from ..timeutil import fmt_dt
 
 router = APIRouter()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
+templates.env.globals["fmt_dt"] = lambda dt: fmt_dt(dt, get_settings().app_timezone)
 
 
 @router.get("/", response_class=HTMLResponse)

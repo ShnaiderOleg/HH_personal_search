@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     # db
     db_path: Path = BASE_DIR / "data" / "hh.db"
 
+    # отображение времени (IANA, например Europe/Moscow)
+    app_timezone: str = "Europe/Moscow"
+
     @property
     def tg_chat_id_list(self) -> list[int]:
         return [int(x.strip()) for x in self.tg_chat_ids.split(",") if x.strip()]

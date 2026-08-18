@@ -53,7 +53,7 @@
         <td>{{ s.title }}</td>
         <td><code>{{ s.query }}</code>{% if s.title_only %}<span class="muted"> · только название</span>{% endif %}</td>
         <td>{{ s.area_name or '—' }}</td>
-        <td class="muted">{{ s.last_run_at.strftime('%d.%m %H:%M') if s.last_run_at else '—' }}</td>
+        <td class="muted">{{ fmt_dt(s.last_run_at) }}</td>
         <td class="error">{{ s.last_error or '' }}</td>
         <td>
           <input type="checkbox" class="search-toggle" data-id="{{ s.id }}" {{ 'checked' if s.active }}>
