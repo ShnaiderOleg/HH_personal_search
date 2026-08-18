@@ -28,6 +28,7 @@ class Poller:
         self._running = False
         self._blocked_until: dict[int, datetime] = {}
         self._block_failures: dict[int, int] = {}
+        self._alerted: dict[int | str, str] = {}
 
     def start(self) -> None:
         self._scheduler = AsyncIOScheduler()
@@ -58,8 +59,9 @@ class Poller:
                     await self._process_search(scraper, db, search)
             finally:
                 db.close()
-        except Exception:
+        except Exception as exc:
             logger.exception("poll cycle failed")
+            await self._send_alert("cycle", f"Ошибка цикла поллинга: {exc!r}")
         finally:
             await scraper.aclose()
             self._running = False
@@ -106,6 +108,11 @@ class Poller:
         search.last_error = error_msg
         db.commit()
 
+        if error_msg:
+            await self._send_alert(search.id, f"Поиск «{search.title}»: {error_msg}")
+        else:
+            self._alerted.pop(search.id, None)
+
         if new_vacancies:
             await self._score_new_vacancies(db, search, new_vacancies)
             await self._notify(new_vacancies)
@@ -151,6 +158,13 @@ class Poller:
         if scored:
             db.commit()
             logger.info("Оценено соответствие для %s/%s новых вакансий поиска '%s'", scored, len(vacancies), search.title)
+
+    async def _send_alert(self, key: int | str, text: str) -> None:
+        """Шлёт алерт в Telegram, не повторяя одинаковый текст для одного ключа."""
+        if not text or self._alerted.get(key) == text:
+            return
+        await telegram_notifier.send_error_alert_telegram(self.settings, text)
+        self._alerted[key] = text
 
     async def _notify(self, new_vacancies) -> None:
         if self.settings.tg_bot_token and self.settings.tg_chat_id_list:

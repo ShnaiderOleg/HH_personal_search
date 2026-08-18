@@ -52,6 +52,30 @@ async def send_new_vacancies_telegram(settings: Settings, vacancies: list[Vacanc
     return sent
 
 
+async def send_error_alert_telegram(settings: Settings, text: str) -> int:
+    """Отправляет алерт об ошибке во все чаты. Возвращает число отправленных."""
+    if not settings.tg_bot_token or not settings.tg_chat_id_list or not text:
+        return 0
+    sent = 0
+    body = f"\u26a0\ufe0f Ошибка HHSearch:\n{text}"
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        for chat_id in settings.tg_chat_id_list:
+            try:
+                resp = await client.post(
+                    _API.format(token=settings.tg_bot_token),
+                    data={
+                        "chat_id": chat_id,
+                        "text": body,
+                        "disable_web_page_preview": True,
+                    },
+                )
+                resp.raise_for_status()
+                sent += 1
+            except httpx.HTTPError as exc:
+                logger.warning("telegram alert to %s failed: %s", chat_id, exc)
+    return sent
+
+
 async def send_test_telegram(settings: Settings) -> int:
     return await send_new_vacancies_telegram(
         settings,

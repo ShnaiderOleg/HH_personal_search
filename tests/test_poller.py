@@ -73,6 +73,49 @@ async def test_score_before_notify(db, make_search):
 
 
 @pytest.mark.asyncio
+async def test_alert_sent_on_block(db, make_search, monkeypatch):
+    async def boom(*args, **kwargs):
+        raise ScraperBlockedError("captcha/anti-bot page detected")
+
+    scraper = object.__new__(HHScraper)
+    scraper.fetch_serp = boom
+
+    alerts = []
+
+    async def fake_send(settings, text):
+        alerts.append(text)
+        return 1
+
+    monkeypatch.setattr("app.notifications.telegram.send_error_alert_telegram", fake_send)
+
+    poller = Poller(get_settings())
+    search = make_search()
+    await poller._process_search(scraper, db, search)
+
+    assert len(alerts) == 1
+    assert "блокировка" in alerts[0]
+    assert "captcha" in alerts[0]
+
+
+@pytest.mark.asyncio
+async def test_alert_dedup(db, monkeypatch):
+    alerts = []
+
+    async def fake_send(settings, text):
+        alerts.append(text)
+        return 1
+
+    monkeypatch.setattr("app.notifications.telegram.send_error_alert_telegram", fake_send)
+
+    poller = Poller(get_settings())
+    await poller._send_alert(1, "same")
+    await poller._send_alert(1, "same")
+    await poller._send_alert(1, "other")
+    await poller._send_alert(2, "same")
+    assert alerts == ["same", "other", "same"]
+
+
+@pytest.mark.asyncio
 async def test_blocked_after_page0_still_ingests_and_notifies(db, make_search):
     async def fake_fetch(query, area_id="", page=0, order_by="publication_time", title_only=False):
         if page >= 1:
