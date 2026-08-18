@@ -23,7 +23,13 @@ templates.env.globals["fmt_dt"] = lambda dt: fmt_dt(dt, get_settings().app_timez
 
 @router.get("/", response_class=HTMLResponse)
 def dashboard(request: Request, db: Session = Depends(get_session)):
-    recent = db.query(Vacancy).order_by(Vacancy.first_seen_at.desc()).limit(10).all()
+    recent = (
+        db.query(Vacancy)
+        .filter(Vacancy.status.is_(None))
+        .order_by(Vacancy.first_seen_at.desc())
+        .limit(10)
+        .all()
+    )
     searches = db.query(Search).order_by(Search.created_at.desc()).all()
     return templates.TemplateResponse(
         request,

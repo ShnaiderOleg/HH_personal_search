@@ -301,15 +301,27 @@ def stats(days: int = Query(30, ge=1, le=365), db: Session = Depends(get_session
         .all()
     )
     counts = {str(day): cnt for day, cnt in rows}
+    applied_rows = (
+        db.query(func.date(Vacancy.applied_at), func.count(Vacancy.id))
+        .filter(Vacancy.applied_at.is_not(None), Vacancy.applied_at >= since)
+        .group_by(func.date(Vacancy.applied_at))
+        .all()
+    )
+    applied_counts = {str(day): cnt for day, cnt in applied_rows}
     result = []
     today = datetime.now(tz).date()
     for i in range(days - 1, -1, -1):
         day = (today - timedelta(days=i)).isoformat()
-        result.append({"date": day, "count": counts.get(day, 0)})
+        result.append({
+            "date": day,
+            "count": counts.get(day, 0),
+            "applied": applied_counts.get(day, 0),
+        })
     return {
         "days": result,
         "total": db.query(Vacancy).count(),
         "favorites": db.query(Vacancy).filter(Vacancy.is_favorite.is_(True)).count(),
+        "applied": db.query(Vacancy).filter(Vacancy.status == "Отклик").count(),
         "searches": db.query(Search).filter(Search.active.is_(True)).count(),
     }
 

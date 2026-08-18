@@ -24,19 +24,23 @@ async function loadStats() {
     for (const [key, el] of Object.entries({
       total: '[data-stat="total"]',
       favorites: '[data-stat="favorites"]',
+      applied: '[data-stat="applied"]',
       searches: '[data-stat="searches"]',
     })) {
       const node = document.querySelector(el);
       if (node) node.textContent = data[key];
     }
-    const max = Math.max(1, ...data.days.map((d) => d.count));
+    const max = Math.max(1, ...data.days.map((d) => Math.max(d.count, d.applied)));
     root.innerHTML = "";
     data.days.forEach((d) => {
-      const bar = document.createElement("div");
-      bar.className = "bar";
-      bar.style.height = `${Math.max(2, Math.round((d.count / max) * 100))}%`;
-      bar.innerHTML = `<span class="tip">${d.date}: ${d.count}</span>`;
-      root.appendChild(bar);
+      const col = document.createElement("div");
+      col.className = "chart-col";
+      const hNew = Math.max(2, Math.round((d.count / max) * 100));
+      const hApplied = Math.max(2, Math.round((d.applied / max) * 100));
+      col.innerHTML =
+        `<div class="bar" style="height:${hNew}%"><span class="tip">${d.date}: новых ${d.count}</span></div>` +
+        `<div class="bar applied" style="height:${hApplied}%"><span class="tip">${d.date}: откликов ${d.applied}</span></div>`;
+      root.appendChild(col);
     });
   } catch (e) {
     console.error(e);
