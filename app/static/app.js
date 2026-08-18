@@ -80,6 +80,42 @@ function initStatusSelect() {
   });
 }
 
+// --- Принудительная оценка соответствия нейросетью ---
+function renderScore(score) {
+  if (score == null) return '<span class="muted">—</span>';
+  const cls = score >= 4 ? "score-good" : score >= 3 ? "score-mid" : "score-bad";
+  return `<span class="score ${cls}">${score}/5</span>`;
+}
+
+async function rescoreVacancy(cell) {
+  const hhId = cell.dataset.hhId;
+  const searchId = cell.dataset.searchId || "";
+  const url = `/api/vacancies/${hhId}/rescore` + (searchId ? `?search_id=${searchId}` : "");
+  cell.innerHTML = '<span class="muted">…</span>';
+  try {
+    const resp = await fetch(url, { method: "POST" });
+    let data = {};
+    try { data = await resp.json(); } catch (e) { /* пустой ответ */ }
+    if (!resp.ok) {
+      cell.title = data.detail || `HTTP ${resp.status}`;
+      cell.innerHTML = '<span class="muted">—</span>';
+      return;
+    }
+    cell.title = "Оценить нейросетью (по резюме из поиска)";
+    cell.innerHTML = renderScore(data.match_score);
+  } catch (e) {
+    console.error(e);
+    cell.title = String(e);
+    cell.innerHTML = '<span class="muted">—</span>';
+  }
+}
+
+function initScoreCells() {
+  document.querySelectorAll(".score-cell").forEach((cell) => {
+    cell.addEventListener("click", () => rescoreVacancy(cell));
+  });
+}
+
 // --- Поиски: добавление, автодополнение регионов, вкл/выкл, удаление ---
 let areaDebounce = null;
 let selectedArea = null;
@@ -138,6 +174,8 @@ function initSearchForm() {
       area_id: data.get("area_id") || "",
       area_name: data.get("area_name") || "",
       title_only: data.get("title_only") ? true : false,
+      resume_url: data.get("resume_url") || "",
+      ai_model: data.get("ai_model") || "",
     };
     const searchId = data.get("search_id");
     const path = searchId ? `/api/searches/${searchId}` : "/api/searches";
@@ -181,6 +219,8 @@ function initSearchEdit() {
   const areaNameInput = form.querySelector('input[name="area_name"]');
   const titleInput = form.querySelector('input[name="title"]');
   const titleOnlyInput = form.querySelector('input[name="title_only"]');
+  const resumeInput = form.querySelector('input[name="resume_url"]');
+  const aiModelSelect = form.querySelector('select[name="ai_model"]');
 
   if (cancel) cancel.addEventListener("click", resetSearchForm);
 
@@ -193,6 +233,8 @@ function initSearchEdit() {
       areaIdInput.value = btn.dataset.areaId || "";
       areaNameInput.value = btn.dataset.areaName || "";
       if (titleOnlyInput) titleOnlyInput.checked = btn.dataset.titleOnly === "1";
+      if (resumeInput) resumeInput.value = btn.dataset.resumeUrl || "";
+      if (aiModelSelect) aiModelSelect.value = btn.dataset.aiModel || "";
       if (submit) submit.textContent = "Сохранить изменения";
       if (cancel) cancel.style.display = "";
       if (msg) msg.textContent = `Редактирование: ${btn.dataset.title}`;
@@ -251,6 +293,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadStats();
   initFavorites();
   initStatusSelect();
+  initScoreCells();
   initAreaSuggest();
   initSearchForm();
   initSearchEdit();

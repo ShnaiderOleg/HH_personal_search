@@ -22,6 +22,23 @@
       <label class="check"><input type="checkbox" name="title_only" value="1"> Только в названии вакансии</label>
     </div>
     <div class="form-row">
+      <label>Моё резюме (WEB-ссылка)
+        <input name="resume_url" placeholder="https://hh.ru/resume/..., https://.../resume.pdf, https://docs.google.com/...">
+      </label>
+      <span class="muted">По этой ссылке нейросеть будет оценивать соответствие новых вакансий. Для hh.ru нужны cookies аккаунта (HH_SESSION_COOKIES).</span>
+    </div>
+    <div class="form-row">
+      <label>Нейросеть для оценки соответствия
+        <select name="ai_model">
+          <option value="">— не оценивать —</option>
+          {% for m in ai_models %}
+          <option value="{{ m.model }}">{{ m.label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <span class="muted">Список моделей — в файле ai_models.json. Ключи API — в .env (GIGACHAT_AUTH_KEY / PROXYAPI_API_KEY).</span>
+    </div>
+    <div class="form-row">
       <label>Регион
         <input id="area-input" name="area_input" autocomplete="off" placeholder="Начните вводить город/регион…">
         <input type="hidden" name="area_id">
@@ -43,9 +60,10 @@
     <button class="btn" id="poll-now">Обновить сейчас</button>
   </div>
   <span id="poll-msg" class="muted"></span>
+  <div class="table-wrap">
   <table class="table">
     <thead>
-      <tr><th>Название</th><th>Запрос</th><th>Регион</th><th>Последний запуск</th><th>Ошибка</th><th>Активен</th><th></th></tr>
+      <tr><th>Название</th><th>Запрос</th><th>Регион</th><th>Оценка ИИ</th><th>Последний запуск</th><th>Ошибка</th><th>Активен</th><th></th></tr>
     </thead>
     <tbody>
       {% for s in searches %}
@@ -53,6 +71,7 @@
         <td>{{ s.title }}</td>
         <td><code>{{ s.query }}</code>{% if s.title_only %}<span class="muted"> · только название</span>{% endif %}</td>
         <td>{{ s.area_name or '—' }}</td>
+        <td class="muted">{{ ai_model_labels.get(s.ai_model, '—') if s.ai_model else '—' }}</td>
         <td class="muted">{{ fmt_dt(s.last_run_at) }}</td>
         <td class="error">{{ s.last_error or '' }}</td>
         <td>
@@ -62,14 +81,17 @@
           <button class="btn search-edit" data-id="{{ s.id }}"
              data-title="{{ s.title }}" data-query="{{ s.query }}"
              data-area-id="{{ s.area_id or '' }}" data-area-name="{{ s.area_name or '' }}"
-             data-title-only="{{ '1' if s.title_only else '0' }}">Изменить</button>
+             data-title-only="{{ '1' if s.title_only else '0' }}"
+             data-resume-url="{{ s.resume_url or '' }}"
+             data-ai-model="{{ s.ai_model or '' }}">Изменить</button>
           <button class="btn danger search-delete" data-id="{{ s.id }}">Удалить</button>
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="7" class="muted">Пока нет ни одного поиска.</td></tr>
+      <tr><td colspan="8" class="muted">Пока нет ни одного поиска.</td></tr>
       {% endfor %}
     </tbody>
   </table>
+  </div>
 </section>
 {% endblock %}

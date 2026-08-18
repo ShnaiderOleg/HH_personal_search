@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from .anti_bot import ScraperBlockedError
+from .ai import AIClient, get_ai_model
 from .config import Settings
 from .db import SessionLocal
 from .hh_scraper import HHScraper
@@ -106,7 +107,50 @@ class Poller:
         db.commit()
 
         if new_vacancies:
+            await self._score_new_vacancies(db, search, new_vacancies)
             await self._notify(new_vacancies)
+
+    async def _score_new_vacancies(self, db, search: Search, vacancies) -> None:
+        """Оценивает новые вакансии нейросетью по резюме из поиска."""
+        resume_url = (search.resume_url or "").strip()
+        model_id = (search.ai_model or "").strip()
+        if not resume_url or not model_id:
+            return
+        spec = get_ai_model(model_id)
+        if spec is None:
+            logger.warning("AI-модель '%s' не найдена в списке, оценка пропущена", model_id)
+            return
+        settings = self.settings
+        if spec["provider"] == "gigachat" and not settings.gigachat_auth_key:
+            logger.warning("GigaChat не настроен (GIGACHAT_AUTH_KEY пуст), оценка пропущена")
+            return
+        if spec["provider"] == "proxyapi" and not settings.proxyapi_api_key:
+            logger.warning("ProxyAPI не настроен (PROXYAPI_API_KEY пуст), оценка пропущена")
+            return
+        client = AIClient(settings)
+        try:
+            resume_text = await client.fetch_resume_text(resume_url)
+        except Exception as exc:
+            logger.warning(
+                "Не удалось загрузить резюме для поиска '%s': %s", search.title, exc
+            )
+            return
+        if not resume_text.strip():
+            logger.warning("Резюме для поиска '%s' пустое", search.title)
+            return
+        scored = 0
+        for vacancy in vacancies:
+            try:
+                score = await client.score_vacancy(spec, resume_text, vacancy)
+                if score is not None:
+                    vacancy.match_score = score
+                    scored += 1
+            except Exception as exc:
+                logger.warning("Оценка вакансии %s не удалась: %s", vacancy.hh_id, exc)
+            await asyncio.sleep(settings.ai_request_delay_seconds)
+        if scored:
+            db.commit()
+            logger.info("Оценено соответствие для %s/%s новых вакансий поиска '%s'", scored, len(vacancies), search.title)
 
     async def _notify(self, new_vacancies) -> None:
         if self.settings.tg_bot_token and self.settings.tg_chat_id_list:

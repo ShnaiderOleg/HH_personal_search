@@ -36,11 +36,17 @@ def _migrate() -> None:
             conn.execute(
                 text("ALTER TABLE searches ADD COLUMN title_only BOOLEAN NOT NULL DEFAULT 0")
             )
+        if "resume_url" not in s_cols:
+            conn.execute(text("ALTER TABLE searches ADD COLUMN resume_url TEXT"))
+        if "ai_model" not in s_cols:
+            conn.execute(text("ALTER TABLE searches ADD COLUMN ai_model VARCHAR(100)"))
         v_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(vacancies)"))}
         if "status" not in v_cols:
             conn.execute(text("ALTER TABLE vacancies ADD COLUMN status VARCHAR(30)"))
         if "applied_at" not in v_cols:
             conn.execute(text("ALTER TABLE vacancies ADD COLUMN applied_at DATETIME"))
+        if "match_score" not in v_cols:
+            conn.execute(text("ALTER TABLE vacancies ADD COLUMN match_score INTEGER"))
         conn.commit()
 
 

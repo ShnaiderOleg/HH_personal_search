@@ -64,6 +64,7 @@ body {
 .table th { font-size: 12px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); }
 .table td a { color: var(--accent); text-decoration: none; }
 .table td a:hover { text-decoration: underline; }
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .muted { color: var(--muted); }
 .error { color: var(--danger); font-size: 12px; }
 
@@ -97,7 +98,8 @@ body {
 .form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
 .form.inline label { flex-direction: column; }
 .form .check { flex-direction: row; align-items: center; }
-.form-buttons { display: flex; align-items: center; gap: 10px; }
+.form-buttons { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.form label input, .form label select { width: 100%; min-width: 0; }
 input, select {
   padding: 8px 10px;
   border: 1px solid var(--border);
@@ -127,6 +129,34 @@ input, select {
 }
 .fav-btn.on { color: #f5a623; }
 
+.score {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 12px;
+}
+.score-good { background: #dcfce7; color: #15803d; }
+.score-mid { background: #fef9c3; color: #a16207; }
+.score-bad { background: #fee2e2; color: #b91c1c; }
+
+.score-cell { cursor: pointer; }
+.score-cell:hover { background: var(--bg); }
+
 .suggest { list-style: none; margin: 4px 0 0; padding: 0; max-height: 220px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; display: none; background: #fff; }
 .suggest li { padding: 6px 10px; cursor: pointer; font-size: 13px; }
 .suggest li:hover { background: var(--bg); }
+
+@media (max-width: 768px) {
+  .topbar { flex-wrap: wrap; gap: 8px 16px; padding: 8px 12px; }
+  .container { margin: 12px auto; padding: 0 8px; }
+  .panel { padding: 12px; border-radius: 10px; }
+  .panel-head { flex-wrap: wrap; }
+  .stats { gap: 10px; }
+  .stat { min-width: 0; flex: 1 1 calc(33.33% - 8px); padding: 10px; }
+  .stat-num { font-size: 24px; }
+  .form.inline { flex-direction: column; align-items: stretch; }
+  .form.inline label { width: 100%; }
+  .table th, .table td { padding: 6px 8px; }
+  .btn { padding: 8px 12px; }
+}

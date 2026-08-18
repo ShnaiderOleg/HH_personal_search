@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from ..config import get_settings
 from ..db import get_session
 from ..models import EMPTY_STATUS, Search, Vacancy
+from ..ai import get_ai_model, load_ai_models
 from ..services.vacancy_service import salary_label
 from ..timeutil import fmt_dt
 
@@ -40,12 +41,15 @@ def dashboard(request: Request, db: Session = Depends(get_session)):
 @router.get("/searches", response_class=HTMLResponse)
 def searches_page(request: Request, db: Session = Depends(get_session)):
     searches = db.query(Search).order_by(Search.created_at.desc()).all()
+    ai_model_labels = {m.get("model"): m.get("label", m.get("model")) for m in load_ai_models()}
     return templates.TemplateResponse(
         request,
         "searches.html",
         {
             "active_page": "searches",
             "searches": searches,
+            "ai_models": load_ai_models(),
+            "ai_model_labels": ai_model_labels,
         },
     )
 

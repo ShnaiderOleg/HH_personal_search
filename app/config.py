@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     # отображение времени (IANA, например Europe/Moscow)
     app_timezone: str = "Europe/Moscow"
 
+    # нейросетевая оценка соответствия резюме
+    gigachat_auth_key: str = ""
+    proxyapi_api_key: str = ""
+    proxyapi_base_url: str = "https://openai.api.proxyapi.ru/v1"
+    ai_request_delay_seconds: float = 1.0
+
     @property
     def tg_chat_id_list(self) -> list[int]:
         return [int(x.strip()) for x in self.tg_chat_ids.split(",") if x.strip()]

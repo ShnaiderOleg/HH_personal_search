@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -9,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..config import get_settings
 from ..db import get_session
+from ..ai import AIClient, get_ai_model
 from ..models import EMPTY_STATUS, Search, SearchVacancy, Vacancy, utcnow
 from ..notifications import telegram as telegram_notifier
 from ..services.vacancy_service import salary_label
@@ -17,6 +19,7 @@ from ..timeutil import ensure_utc
 from .. import areas as areas_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class SearchIn(BaseModel):
@@ -25,6 +28,8 @@ class SearchIn(BaseModel):
     area_id: str = ""
     area_name: str = ""
     title_only: bool = False
+    resume_url: str = ""
+    ai_model: str = ""
 
 
 class SearchPatch(BaseModel):
@@ -43,6 +48,8 @@ def _search_out(search: Search) -> dict:
         "area_id": search.area_id,
         "area_name": search.area_name,
         "title_only": search.title_only,
+        "resume_url": search.resume_url,
+        "ai_model": search.ai_model,
         "active": search.active,
         "created_at": ensure_utc(search.created_at),
         "last_run_at": ensure_utc(search.last_run_at),
@@ -67,6 +74,7 @@ def _vacancy_out(vacancy: Vacancy, search_ids: list[int] | None = None) -> dict:
         "is_favorite": vacancy.is_favorite,
         "status": vacancy.status,
         "applied_at": ensure_utc(vacancy.applied_at),
+        "match_score": vacancy.match_score,
         "search_ids": search_ids or [],
     }
 
@@ -83,7 +91,10 @@ def list_searches(db: Session = Depends(get_session)):
 def create_search(payload: SearchIn, db: Session = Depends(get_session)):
     if db.query(Search).filter(Search.title == payload.title).first():
         raise HTTPException(409, "Поиск с таким названием уже есть")
-    search = Search(**payload.model_dump())
+    data = payload.model_dump()
+    data["resume_url"] = (data.get("resume_url") or "").strip() or None
+    data["ai_model"] = (data.get("ai_model") or "").strip() or None
+    search = Search(**data)
     db.add(search)
     db.commit()
     db.refresh(search)
@@ -106,6 +117,8 @@ def update_search(search_id: int, payload: SearchIn, db: Session = Depends(get_s
     search.area_id = payload.area_id
     search.area_name = payload.area_name
     search.title_only = payload.title_only
+    search.resume_url = payload.resume_url.strip() or None
+    search.ai_model = payload.ai_model.strip() or None
     db.commit()
     db.refresh(search)
     return _search_out(search)
@@ -206,6 +219,64 @@ def set_vacancy_status(hh_id: str, payload: VacancyStatus, db: Session = Depends
         "status": vacancy.status,
         "applied_at": vacancy.applied_at,
     }
+
+
+def _pick_score_search(db, vacancy_id: int, search_id: int | None) -> Search | None:
+    """Возвращает поиск с настроенным резюме/нейросетью для оценки вакансии."""
+    if search_id is not None:
+        search = db.get(Search, search_id)
+        if search and search.resume_url and search.ai_model:
+            return search
+    rows = (
+        db.query(Search)
+        .join(SearchVacancy)
+        .filter(SearchVacancy.vacancy_id == vacancy_id)
+        .order_by(Search.created_at.desc())
+        .all()
+    )
+    return next((s for s in rows if s.resume_url and s.ai_model), None)
+
+
+@router.post("/vacancies/{hh_id}/rescore")
+async def rescore_vacancy(
+    hh_id: str,
+    search_id: int | None = None,
+    db: Session = Depends(get_session),
+):
+    """Принудительно пересчитывает оценку соответствия вакансии нейросетью."""
+    vacancy = db.query(Vacancy).filter(Vacancy.hh_id == hh_id).first()
+    if vacancy is None:
+        raise HTTPException(404, "Вакансия не найдена")
+    settings = get_settings()
+    search = _pick_score_search(db, vacancy.id, search_id)
+    if search is None:
+        raise HTTPException(
+            400, "У вакансии нет поиска с настроенным резюме и нейросетью"
+        )
+    spec = get_ai_model(search.ai_model)
+    if spec is None:
+        raise HTTPException(400, f"Нейросеть '{search.ai_model}' не найдена в списке")
+    if spec["provider"] == "gigachat" and not settings.gigachat_auth_key:
+        raise HTTPException(400, "GigaChat не настроен (GIGACHAT_AUTH_KEY пуст)")
+    if spec["provider"] == "proxyapi" and not settings.proxyapi_api_key:
+        raise HTTPException(400, "ProxyAPI не настроен (PROXYAPI_API_KEY пуст)")
+    client = AIClient(settings)
+    try:
+        resume_text = await client.fetch_resume_text(search.resume_url)
+        if not resume_text.strip():
+            raise HTTPException(400, "Резюме по ссылке пустое или недоступно")
+        score = await client.score_vacancy(spec, resume_text, vacancy)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("rescore вакансии %s не удалось", hh_id)
+        raise HTTPException(502, f"Ошибка нейросети: {exc}") from exc
+    if score is None:
+        raise HTTPException(502, "Нейросеть не вернула оценку")
+    vacancy.match_score = score
+    db.commit()
+    db.refresh(vacancy)
+    return {"hh_id": hh_id, "match_score": score}
 
 
 # --- Регионы ---

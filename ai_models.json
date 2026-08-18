@@ -1,0 +1,15 @@
+[
+  { "provider": "gigachat", "model": "GigaChat-3-Ultra", "label": "GigaChat 3 Ultra (Sber, freemium)" },
+  { "provider": "gigachat", "model": "GigaChat-2-Max", "label": "GigaChat 2 Max (Sber, макс. качество)" },
+  { "provider": "gigachat", "model": "GigaChat-2-Pro", "label": "GigaChat 2 Pro (Sber)" },
+  { "provider": "gigachat", "model": "GigaChat-2", "label": "GigaChat 2 (Sber, быстрая и дешёвая)" },
+  { "provider": "proxyapi", "model": "openai/gpt-5.6-luna", "label": "GPT-5.6 Luna (OpenAI)" },
+  { "provider": "proxyapi", "model": "openai/gpt-5.5", "label": "GPT-5.5 (OpenAI)" },
+  { "provider": "proxyapi", "model": "openai/gpt-5.4-mini", "label": "GPT-5.4 Mini (OpenAI, дёшево)" },
+  { "provider": "proxyapi", "model": "anthropic/claude-sonnet-5", "label": "Claude Sonnet 5 (Anthropic)" },
+  { "provider": "proxyapi", "model": "anthropic/claude-opus-5", "label": "Claude Opus 5 (Anthropic, макс.)" },
+  { "provider": "proxyapi", "model": "anthropic/claude-haiku-4-5", "label": "Claude Haiku 4.5 (Anthropic, дёшево)" },
+  { "provider": "proxyapi", "model": "gemini/gemini-3.7-flash", "label": "Gemini 3.7 Flash (Google)" },
+  { "provider": "proxyapi", "model": "gemini/gemini-2.5-pro", "label": "Gemini 2.5 Pro (Google)" },
+  { "provider": "proxyapi", "model": "gemini/gemini-2.5-flash-lite", "label": "Gemini 2.5 Flash-Lite (Google, дёшево)" }
+]

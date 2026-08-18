@@ -155,6 +155,49 @@ def test_vacancy_status(client, db):
     assert client.post("/api/vacancies/999/status", json={"status": "Отказ"}).status_code == 404
 
 
+def test_vacancy_rescore(client, db, make_search, monkeypatch):
+    search = make_search(resume_url="https://example.com/resume.txt", ai_model="GigaChat-2-Pro")
+    v = Vacancy(hh_id="55", title="T", url="https://hh.ru/vacancy/55", first_seen_at=utcnow())
+    db.add(v)
+    db.commit()
+
+    from app.models import SearchVacancy
+
+    db.add(SearchVacancy(search_id=search.id, vacancy_id=v.id))
+    db.commit()
+
+    async def fake_fetch_resume(self, url, max_chars=12000):
+        return "Python, 5 лет, Москва"
+
+    async def fake_score(self, spec, resume_text, vacancy):
+        return 4
+
+    from app import ai as ai_module
+
+    monkeypatch.setattr(ai_module.AIClient, "fetch_resume_text", fake_fetch_resume)
+    monkeypatch.setattr(ai_module.AIClient, "score_vacancy", fake_score)
+
+    resp = client.post("/api/vacancies/55/rescore")
+    assert resp.status_code == 200
+    assert resp.json()["match_score"] == 4
+
+    db.expire_all()
+    v = db.query(Vacancy).filter(Vacancy.hh_id == "55").one()
+    assert v.match_score == 4
+
+    resp = client.get("/api/vacancies", params={"q": "T"})
+    assert resp.json()["items"][0]["match_score"] == 4
+
+    assert client.post("/api/vacancies/999/rescore").status_code == 404
+
+
+def test_vacancy_rescore_no_search_config(client, db):
+    db.add(Vacancy(hh_id="66", title="T", url="https://hh.ru/vacancy/66", first_seen_at=utcnow()))
+    db.commit()
+    resp = client.post("/api/vacancies/66/rescore")
+    assert resp.status_code == 400
+
+
 def test_stats(client, db):
     db.add(Vacancy(hh_id="1", title="T", url="https://hh.ru/vacancy/1",
                    first_seen_at=utcnow()))

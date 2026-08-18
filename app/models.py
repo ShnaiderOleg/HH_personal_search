@@ -30,6 +30,8 @@ class Search(Base):
     area_id: Mapped[str] = mapped_column(String(20), default="")
     area_name: Mapped[str] = mapped_column(String(200), default="")
     title_only: Mapped[bool] = mapped_column(Boolean, default=False)
+    resume_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_model: Mapped[str | None] = mapped_column(String(100), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -60,6 +62,7 @@ class Vacancy(Base):
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
     status: Mapped[str | None] = mapped_column(String(30), nullable=True)
     applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    match_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     searches: Mapped[list["Search"]] = relationship(
         secondary="search_vacancies", back_populates="vacancies"

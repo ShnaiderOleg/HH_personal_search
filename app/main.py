@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -9,6 +10,11 @@ from .db import init_db
 from .poller import Poller
 from .routers import api, pages
 from .state import state
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 
