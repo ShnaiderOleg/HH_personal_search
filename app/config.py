@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     gigachat_auth_key: str = ""
     proxyapi_api_key: str = ""
     proxyapi_base_url: str = "https://openai.api.proxyapi.ru/v1"
+    ollama_base_url: str = "http://localhost:11434"
     ai_request_delay_seconds: float = 1.0
 
     @property

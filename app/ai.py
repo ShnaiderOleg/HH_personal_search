@@ -118,6 +118,8 @@ class AIClient:
             return await self._giga_chat(spec["model"], messages, temperature, max_tokens)
         if provider == "proxyapi":
             return await self._proxyapi_chat(spec["model"], messages, temperature, max_tokens)
+        if provider == "ollama":
+            return await self._ollama_chat(spec["model"], messages, temperature)
         raise ValueError(f"неизвестный провайдер модели: {provider}")
 
     async def _giga_chat(self, model: str, messages: list[dict], temperature: float, max_tokens: int) -> str:
@@ -158,6 +160,24 @@ class AIClient:
             resp = await client.post(
                 f"{self.settings.proxyapi_base_url.rstrip('/')}/chat/completions",
                 headers=headers,
+                json=payload,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        return data["choices"][0]["message"]["content"]
+
+    async def _ollama_chat(self, model: str, messages: list[dict], temperature: float) -> str:
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+            "stream": False,
+            "options": {"num_predict": 2048},
+        }
+        async with self._http_client(600.0) as client:
+            resp = await client.post(
+                f"{self.settings.ollama_base_url.rstrip('/')}/v1/chat/completions",
+                headers={"Content-Type": "application/json"},
                 json=payload,
             )
             resp.raise_for_status()
