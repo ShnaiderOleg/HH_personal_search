@@ -10,11 +10,13 @@
 }
 
 * { box-sizing: border-box; }
+html { min-width: 0; }
 body {
   margin: 0;
   font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   background: var(--bg);
   color: var(--text);
+  overflow-x: hidden;
 }
 
 .topbar {
@@ -32,6 +34,7 @@ body {
 .topbar nav a.active { background: var(--accent); color: #fff; }
 
 .container { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+.container, .panel, .form, .form-row, .form label { min-width: 0; }
 
 .panel {
   background: var(--panel);
@@ -68,6 +71,7 @@ body {
 .table .cell-nowrap { white-space: nowrap; }
 .table select { max-width: 100%; min-width: 0; font-size: 12px; }
 .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-action-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
 .muted { color: var(--muted); }
 .error { color: var(--danger); font-size: 12px; }
 
@@ -111,6 +115,13 @@ body {
 .form .check { flex-direction: row; align-items: center; }
 .form-buttons { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .form label input, .form label select { width: 100%; min-width: 0; }
+input[type="checkbox"] {
+  width: 16px !important;
+  height: 16px;
+  min-width: 16px !important;
+  margin: 0;
+  flex: 0 0 16px;
+}
 input, select {
   padding: 8px 10px;
   border: 1px solid var(--border);
@@ -118,6 +129,7 @@ input, select {
   font-size: 14px;
   background: #fff;
   min-width: 180px;
+  max-width: 100%;
 }
 .btn {
   padding: 8px 16px;
@@ -158,16 +170,72 @@ input, select {
 .suggest li { padding: 6px 10px; cursor: pointer; font-size: 13px; }
 .suggest li:hover { background: var(--bg); }
 
+code { overflow-wrap: anywhere; word-break: break-word; }
+
 @media (max-width: 768px) {
   .topbar { flex-wrap: wrap; gap: 8px 16px; padding: 8px 12px; }
+  .topbar nav { min-width: 0; overflow-x: auto; }
   .container { margin: 12px auto; padding: 0 8px; }
   .panel { padding: 12px; border-radius: 10px; }
   .panel-head { flex-wrap: wrap; }
-  .stats { gap: 10px; }
-  .stat { min-width: 0; flex: 1 1 calc(33.33% - 8px); padding: 10px; }
+  .stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .stat { min-width: 0; padding: 10px 6px; }
   .stat-num { font-size: 24px; }
+  .stat-label { font-size: 12px; line-height: 1.25; text-align: center; }
   .form.inline { flex-direction: column; align-items: stretch; }
   .form.inline label { width: 100%; }
+  .form .check { align-self: stretch; flex-direction: row; align-items: center; }
   .table th, .table td { padding: 6px 8px; }
   .btn { padding: 8px 12px; }
+
+  .responsive-table,
+  .responsive-table tbody,
+  .responsive-table tr,
+  .responsive-table td { display: block; width: 100%; }
+  .responsive-table { table-layout: auto; }
+  .responsive-table thead { display: none; }
+  .responsive-table tbody { display: grid; gap: 12px; }
+  .responsive-table tr {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #fff;
+  }
+  .responsive-table td {
+    display: grid;
+    grid-template-columns: minmax(92px, 34%) minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+    padding: 9px 10px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .responsive-table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.4;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+  }
+  .responsive-table td:last-child { border-bottom: 0; }
+  .responsive-table td.empty-state { display: block; }
+  .responsive-table td.empty-state::before { display: none; }
+  .responsive-table .cell-nowrap { white-space: normal; }
+  .responsive-table select { width: 100%; font-size: 14px; }
+  .responsive-table .fav-btn { justify-self: start; padding: 0; }
+  .table-wrap { overflow: visible; }
+}
+
+@media (max-width: 480px) {
+  .topbar { gap: 8px; }
+  .topbar .brand { width: 100%; padding-left: 4px; }
+  .topbar nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; gap: 4px; }
+  .topbar nav a { padding: 7px 4px; text-align: center; font-size: 13px; }
+  .panel h2 { font-size: 16px; line-height: 1.3; }
+  .form-buttons { align-items: stretch; }
+  .form-buttons .btn { flex: 1 1 auto; }
+  .chart { height: 120px; gap: 2px; }
+  .responsive-table td { grid-template-columns: minmax(84px, 32%) minmax(0, 1fr); }
 }

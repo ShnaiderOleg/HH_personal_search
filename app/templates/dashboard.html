@@ -20,27 +20,27 @@
 <section class="panel">
   <h2>Последние найденные вакансии</h2>
   <div class="table-wrap">
-  <table class="table">
+  <table class="table responsive-table dashboard-table">
     <thead>
       <tr><th style="width:25%">Вакансия</th><th style="width:12%">Зарплата</th><th style="width:18%">Компания</th><th style="width:12%">Регион</th><th style="width:8%">Оценка</th><th style="width:20%">Найдена</th><th style="width:5%"></th></tr>
     </thead>
     <tbody>
       {% for v in recent %}
       <tr>
-        <td class="cell-ellipsis"><a href="{{ v.url }}" target="_blank" rel="noopener">{{ v.title }}</a></td>
-        <td class="cell-nowrap">{{ salary_label(v) }}</td>
-        <td class="cell-ellipsis">{{ v.employer or '—' }}</td>
-        <td class="cell-nowrap">{{ v.area or '—' }}</td>
-        <td class="score-cell cell-nowrap" data-hh-id="{{ v.hh_id }}" data-search-id="" title="Оценить нейросетью (по резюме из поиска)">
+        <td class="cell-ellipsis" data-label="Вакансия"><a href="{{ v.url }}" target="_blank" rel="noopener">{{ v.title }}</a></td>
+        <td class="cell-nowrap" data-label="Зарплата">{{ salary_label(v) }}</td>
+        <td class="cell-ellipsis" data-label="Компания">{{ v.employer or '—' }}</td>
+        <td class="cell-nowrap" data-label="Регион">{{ v.area or '—' }}</td>
+        <td class="score-cell cell-nowrap" data-label="Оценка" data-hh-id="{{ v.hh_id }}" data-search-id="" title="Оценить нейросетью (по резюме из поиска)">
           {% if v.match_score is not none %}<span class="score {{ 'score-good' if v.match_score >= 4 else ('score-mid' if v.match_score >= 3 else 'score-bad') }}">{{ v.match_score }}/5</span>{% else %}<span class="muted">—</span>{% endif %}
         </td>
-        <td class="cell-nowrap muted">{{ fmt_dt(v.first_seen_at) }}</td>
-        <td class="cell-nowrap">
+        <td class="cell-nowrap muted" data-label="Найдена">{{ fmt_dt(v.first_seen_at) }}</td>
+        <td class="cell-nowrap" data-label="Избранное">
           <button class="fav-btn {{ 'on' if v.is_favorite }}" data-hh-id="{{ v.hh_id }}" title="В избранное">★</button>
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="7" class="muted">Вакансий пока нет. Настройте поиски или дождитесь поллинга.</td></tr>
+      <tr><td colspan="7" class="muted empty-state">Вакансий пока нет. Настройте поиски или дождитесь поллинга.</td></tr>
       {% endfor %}
     </tbody>
   </table>
