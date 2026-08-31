@@ -1,3 +1,4 @@
+from datetime import date
 from functools import lru_cache
 from pathlib import Path
 
@@ -42,6 +43,9 @@ class Settings(BaseSettings):
 
     # отображение времени (IANA, например Europe/Moscow)
     app_timezone: str = "Europe/Moscow"
+
+    # начальная дата временного ряда на дашборде
+    dashboard_stats_from: date = date(2026, 8, 18)
 
     # версия URL статических файлов; пусто = хеш содержимого CSS/JS
     static_version: str = ""

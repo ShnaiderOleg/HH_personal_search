@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -290,28 +290,37 @@ def areas(q: str = Query("", max_length=100)):
 # --- Статистика ---
 
 @router.get("/stats")
-def stats(days: int = Query(30, ge=1, le=365), db: Session = Depends(get_session)):
+def stats(
+    days: int = Query(30, ge=1, le=365),
+    date_from: date | None = Query(None),
+    db: Session = Depends(get_session),
+):
     settings = get_settings()
     tz = ZoneInfo(settings.app_timezone)
-    since = datetime.now(timezone.utc) - timedelta(days=days)
+    today = datetime.now(tz).date()
+    start_date = date_from or (today - timedelta(days=days - 1))
+    start_date_iso = start_date.isoformat()
     rows = (
         db.query(func.date(Vacancy.first_seen_at), func.count(Vacancy.id))
-        .filter(Vacancy.first_seen_at >= since)
+        .filter(func.date(Vacancy.first_seen_at) >= start_date_iso)
         .group_by(func.date(Vacancy.first_seen_at))
         .all()
     )
     counts = {str(day): cnt for day, cnt in rows}
     applied_rows = (
         db.query(func.date(Vacancy.applied_at), func.count(Vacancy.id))
-        .filter(Vacancy.applied_at.is_not(None), Vacancy.applied_at >= since)
+        .filter(
+            Vacancy.applied_at.is_not(None),
+            func.date(Vacancy.applied_at) >= start_date_iso,
+        )
         .group_by(func.date(Vacancy.applied_at))
         .all()
     )
     applied_counts = {str(day): cnt for day, cnt in applied_rows}
     result = []
-    today = datetime.now(tz).date()
-    for i in range(days - 1, -1, -1):
-        day = (today - timedelta(days=i)).isoformat()
+    day_count = max(0, (today - start_date).days + 1)
+    for offset in range(day_count):
+        day = (start_date + timedelta(days=offset)).isoformat()
         result.append({
             "date": day,
             "count": counts.get(day, 0),

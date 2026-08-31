@@ -9,12 +9,12 @@
 </section>
 
 <section class="panel">
-  <h2>Новые вакансии и отклики за 30 дней</h2>
+  <h2>Новые вакансии и отклики с {{ dashboard_stats_from.strftime('%d.%m.%Y') }}</h2>
   <div class="chart-legend">
     <span><i class="swatch swatch-new"></i> новые вакансии</span>
     <span><i class="swatch swatch-applied"></i> отклики</span>
   </div>
-  <div id="chart" class="chart"></div>
+  <div id="chart" class="chart" data-stats-from="{{ dashboard_stats_from.isoformat() }}"></div>
 </section>
 
 <section class="panel">

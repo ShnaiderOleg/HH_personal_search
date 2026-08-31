@@ -38,6 +38,7 @@ templates.env.globals["static_version"] = _get_static_version()
 
 @router.get("/", response_class=HTMLResponse)
 def dashboard(request: Request, db: Session = Depends(get_session)):
+    settings = get_settings()
     recent = (
         db.query(Vacancy)
         .filter(Vacancy.status.is_(None))
@@ -55,6 +56,7 @@ def dashboard(request: Request, db: Session = Depends(get_session)):
             "searches": searches,
             "salary_label": salary_label,
             "now": datetime.now(timezone.utc),
+            "dashboard_stats_from": settings.dashboard_stats_from,
         },
     )
 

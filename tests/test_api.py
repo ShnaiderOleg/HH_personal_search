@@ -285,6 +285,41 @@ def test_stats(client, db):
     assert data["days"][-1]["count"] == 1
 
 
+def test_stats_date_from_excludes_initial_import_but_keeps_total(client, db):
+    db.add_all(
+        [
+            Vacancy(
+                hh_id="initial-import",
+                title="Первичная загрузка",
+                url="https://hh.ru/vacancy/initial-import",
+                first_seen_at=datetime(2026, 8, 17, 12, tzinfo=timezone.utc),
+            ),
+            Vacancy(
+                hh_id="regular-vacancy",
+                title="Обычная вакансия",
+                url="https://hh.ru/vacancy/regular-vacancy",
+                first_seen_at=datetime(2026, 8, 18, 12, tzinfo=timezone.utc),
+            ),
+        ]
+    )
+    db.commit()
+
+    data = client.get("/api/stats", params={"date_from": "2026-08-18"}).json()
+    days = {row["date"]: row for row in data["days"]}
+
+    assert "2026-08-17" not in days
+    assert days["2026-08-18"]["count"] == 1
+    assert data["total"] == 2
+
+
+def test_dashboard_uses_configured_stats_start_date(client):
+    resp = client.get("/")
+
+    assert resp.status_code == 200
+    assert 'data-stats-from="2026-08-18"' in resp.text
+    assert "Новые вакансии и отклики с 18.08.2026" in resp.text
+
+
 def test_areas_suggest(client, monkeypatch):
     def fake_fetch_tree(_settings):
         return [

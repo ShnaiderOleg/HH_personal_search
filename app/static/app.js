@@ -20,7 +20,11 @@ async function loadStats() {
   const root = document.querySelector("#chart");
   if (!root) return;
   try {
-    const data = await api("/api/stats?days=30");
+    const dateFrom = root.dataset.statsFrom;
+    const statsUrl = dateFrom
+      ? `/api/stats?date_from=${encodeURIComponent(dateFrom)}`
+      : "/api/stats?days=30";
+    const data = await api(statsUrl);
     for (const [key, el] of Object.entries({
       total: '[data-stat="total"]',
       favorites: '[data-stat="favorites"]',
