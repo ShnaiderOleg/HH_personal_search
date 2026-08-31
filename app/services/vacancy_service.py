@@ -9,9 +9,12 @@ from ..models import Search, SearchVacancy, Vacancy, utcnow
 def ingest_vacancies(db: Session, search: Search, cards: list[VacancyCard]) -> list[Vacancy]:
     """Сохраняет найденные вакансии, связывает с поиском, возвращает только новые."""
     new_vacancies: list[Vacancy] = []
+    history = _build_vacancy_history(db)
     for card in cards:
         vacancy = db.query(Vacancy).filter(Vacancy.hh_id == card.hh_id).first()
         if vacancy is None:
+            identity = _vacancy_identity(card.title, card.employer)
+            previous = history.get(identity) if identity else None
             vacancy = Vacancy(
                 hh_id=card.hh_id,
                 title=card.title,
@@ -24,10 +27,19 @@ def ingest_vacancies(db: Session, search: Search, cards: list[VacancyCard]) -> l
                 area=card.area,
                 experience=card.experience,
                 first_seen_at=utcnow(),
+                status=previous.status if previous else None,
             )
+            if previous:
+                vacancy._is_repeat = True
+                vacancy._previous_status = previous.status
+                vacancy._previous_hh_id = previous.hh_id
             db.add(vacancy)
             db.flush()
             new_vacancies.append(vacancy)
+            if identity:
+                current = history.get(identity)
+                if current is None or (vacancy.status and not current.status):
+                    history[identity] = vacancy
         else:
             _refresh_fields(vacancy, card)
 
@@ -41,6 +53,40 @@ def ingest_vacancies(db: Session, search: Search, cards: list[VacancyCard]) -> l
 
     db.commit()
     return new_vacancies
+
+
+def _normalize_identity_part(value: str | None) -> str:
+    return " ".join((value or "").casefold().split())
+
+
+def _vacancy_identity(title: str | None, employer: str | None) -> tuple[str, str] | None:
+    normalized_title = _normalize_identity_part(title)
+    normalized_employer = _normalize_identity_part(employer)
+    if not normalized_title or not normalized_employer:
+        return None
+    return normalized_title, normalized_employer
+
+
+def _build_vacancy_history(db: Session) -> dict[tuple[str, str], Vacancy]:
+    """Возвращает по каждой паре название/компания свежую запись с заполненным статусом.
+
+    Если заполненного статуса нет, сохраняется самая свежая запись — она всё равно
+    нужна, чтобы пометить новую вакансию как повтор.
+    """
+    history: dict[tuple[str, str], Vacancy] = {}
+    vacancies = (
+        db.query(Vacancy)
+        .order_by(Vacancy.first_seen_at.desc(), Vacancy.id.desc())
+        .all()
+    )
+    for vacancy in vacancies:
+        identity = _vacancy_identity(vacancy.title, vacancy.employer)
+        if identity is None:
+            continue
+        current = history.get(identity)
+        if current is None or (vacancy.status and not current.status):
+            history[identity] = vacancy
+    return history
 
 
 def _refresh_fields(vacancy: Vacancy, card: VacancyCard) -> None:

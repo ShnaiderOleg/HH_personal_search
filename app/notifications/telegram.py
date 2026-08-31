@@ -15,8 +15,13 @@ _API = "https://api.telegram.org/bot{token}/sendMessage"
 def _card(vacancy: Vacancy) -> str:
     parts = [
         f"<b>{html.escape(vacancy.title)}</b>",
-        f"\U0001f4b0 {html.escape(salary_label(vacancy))}",
     ]
+    if getattr(vacancy, "_is_repeat", False):
+        previous_status = getattr(vacancy, "_previous_status", None) or "не указан"
+        parts.append(
+            f"\U0001f501 Повтор — прошлый статус: <b>{html.escape(previous_status)}</b>"
+        )
+    parts.append(f"\U0001f4b0 {html.escape(salary_label(vacancy))}")
     if vacancy.employer:
         parts.append(f"\U0001f3e2 {html.escape(vacancy.employer)}")
     if vacancy.area:

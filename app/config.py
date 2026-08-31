@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     # отображение времени (IANA, например Europe/Moscow)
     app_timezone: str = "Europe/Moscow"
 
+    # версия URL статических файлов; пусто = хеш содержимого CSS/JS
+    static_version: str = ""
+
     # нейросетевая оценка соответствия резюме
     gigachat_auth_key: str = ""
     proxyapi_api_key: str = ""

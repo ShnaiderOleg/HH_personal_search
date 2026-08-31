@@ -33,6 +33,9 @@ Copy-Item .env.example .env
 2. **Email** (опционально): заполните `SMTP_HOST/PORT/USER/PASSWORD/FROM/TO`.
 3. `HH_SESSION_COOKIES` — пусто для анонимного парсинга; для входа под аккаунтом вставьте
    cookies форматом `name=value; name2=value2`.
+4. `STATIC_VERSION` — необязательная версия URL для CSS/JavaScript. Если оставить пустой,
+   приложение автоматически использует хеш содержимого `style.css` и `app.js`. При необходимости
+   можно задать версию вручную, например короткий Git commit SHA.
 
 ## Запуск
 

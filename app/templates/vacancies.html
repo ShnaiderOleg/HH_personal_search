@@ -14,6 +14,14 @@
     <label>Название содержит
       <input name="q" value="{{ current_q }}" placeholder="Ключевые слова…">
     </label>
+    <label>Компания
+      <select name="employer">
+        <option value="">Все</option>
+        {% for employer in employers %}
+        <option value="{{ employer }}" {{ 'selected' if current_employer == employer }}>{{ employer }}</option>
+        {% endfor %}
+      </select>
+    </label>
     <label>Статус
       <select name="status">
         <option value="">Все</option>
@@ -25,6 +33,7 @@
     </label>
     <label class="check"><input type="checkbox" name="favorite" value="1" {{ 'checked' if current_favorite }}> Только избранное</label>
     <button type="submit" class="btn">Фильтровать</button>
+    <a href="/vacancies" class="btn">Сбросить фильтр</a>
   </form>
 </section>
 
@@ -39,7 +48,9 @@
       <tr>
         <td class="cell-ellipsis" data-label="Вакансия"><a href="{{ v.url }}" target="_blank" rel="noopener">{{ v.title }}</a></td>
         <td data-label="Зарплата">{{ salary_label(v) }}</td>
-        <td class="cell-ellipsis" data-label="Компания">{{ v.employer or '—' }}</td>
+        <td class="cell-ellipsis" data-label="Компания">
+          {% if v.employer %}<a class="company-filter-link" href="/vacancies?employer={{ v.employer | urlencode }}" title="Показать вакансии этой компании">{{ v.employer }}</a>{% else %}—{% endif %}
+        </td>
         <td data-label="Регион">{{ v.area or '—' }}</td>
         <td class="score-cell cell-nowrap" data-label="Оценка" data-hh-id="{{ v.hh_id }}" data-search-id="{{ current_search_id or '' }}" title="Оценить нейросетью (по резюме из поиска)">
           {% if v.match_score is not none %}<span class="score {{ 'score-good' if v.match_score >= 4 else ('score-mid' if v.match_score >= 3 else 'score-bad') }}">{{ v.match_score }}/5</span>{% else %}<span class="muted">—</span>{% endif %}

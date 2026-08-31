@@ -1,4 +1,5 @@
 from app.hh_scraper import VacancyCard
+from app.models import Vacancy
 from app.services.vacancy_service import ingest_vacancies
 
 
@@ -66,3 +67,68 @@ def test_fields_refresh(db, make_search):
     assert stored.salary_from == 150_000
     assert stored.salary_to == 200_000
     assert stored.employer == "Другая компания"
+
+
+def test_new_id_same_title_and_company_inherits_status(db, make_search):
+    search = make_search()
+    old = ingest_vacancies(db, search, [_card("old", "Python Developer")])[0]
+    old.status = "Отказ"
+    db.commit()
+
+    repeat_card = VacancyCard(
+        hh_id="new",
+        title="  PYTHON   developer ",
+        url="https://hh.ru/vacancy/new",
+        salary_from=120_000,
+        salary_to=None,
+        currency="RUR",
+        employer=" компания ",
+        area="Москва",
+        experience=None,
+        activity_text="Сегодня",
+    )
+    repeat = ingest_vacancies(db, search, [repeat_card])[0]
+
+    assert repeat.status == "Отказ"
+    assert repeat._is_repeat is True
+    assert repeat._previous_status == "Отказ"
+    assert repeat._previous_hh_id == "old"
+
+
+def test_repeat_uses_latest_filled_status(db, make_search):
+    search = make_search()
+    older = ingest_vacancies(db, search, [_card("old-1")])[0]
+    older.status = "не интересует"
+    db.commit()
+
+    newer_without_status = Vacancy(
+        hh_id="old-2",
+        title="Вакансия",
+        url="https://hh.ru/vacancy/old-2",
+        employer="Компания",
+        first_seen_at=older.first_seen_at,
+    )
+    db.add(newer_without_status)
+    db.commit()
+
+    repeat = ingest_vacancies(db, search, [_card("new")])[0]
+    assert repeat.status == "не интересует"
+    assert repeat._previous_hh_id == "old-1"
+
+
+def test_same_title_at_other_company_is_not_repeat(db, make_search):
+    search = make_search()
+    old = ingest_vacancies(db, search, [_card("old")])[0]
+    old.status = "Отказ"
+    db.commit()
+
+    other_company = VacancyCard(
+        hh_id="new",
+        title="Вакансия",
+        url="https://hh.ru/vacancy/new",
+        employer="Другая компания",
+    )
+    fresh = ingest_vacancies(db, search, [other_company])[0]
+
+    assert fresh.status is None
+    assert not getattr(fresh, "_is_repeat", False)

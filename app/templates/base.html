@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}HHSearch{% endblock %}</title>
   <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
-  <link rel="stylesheet" href="/static/style.css">
-  <script src="/static/app.js" defer></script>
+  <link rel="stylesheet" href="/static/style.css?v={{ static_version | urlencode }}">
+  <script src="/static/app.js?v={{ static_version | urlencode }}" defer></script>
 </head>
 <body>
   <header class="topbar">

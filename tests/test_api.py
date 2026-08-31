@@ -1,8 +1,35 @@
 from datetime import datetime, timezone
+from types import SimpleNamespace
+from urllib.parse import parse_qs, urlparse
 
 import pytest
+from bs4 import BeautifulSoup
 
 from app.models import Vacancy, utcnow
+
+
+def test_pages_use_versioned_static_urls(client):
+    from app.routers.pages import templates
+
+    static_version = templates.env.globals["static_version"]
+    assert static_version
+
+    for path in ("/", "/searches", "/vacancies"):
+        resp = client.get(path)
+        assert resp.status_code == 200
+        assert f'/static/style.css?v={static_version}' in resp.text
+        assert f'/static/app.js?v={static_version}' in resp.text
+
+
+def test_static_version_can_be_configured(monkeypatch):
+    from app.routers import pages
+
+    monkeypatch.setattr(
+        pages,
+        "get_settings",
+        lambda: SimpleNamespace(static_version="release-42"),
+    )
+    assert pages._get_static_version() == "release-42"
 
 
 def test_searches_crud(client, make_search):
@@ -123,6 +150,56 @@ def test_vacancies_empty_search_id_not_422(client, db, make_search):
 
     resp = client.get("/vacancies", params={"search_id": "", "q": "python"})
     assert resp.status_code == 200
+
+
+def test_vacancies_page_filters_by_employer(client, db):
+    db.add_all(
+        [
+            Vacancy(
+                hh_id="company-1",
+                title="Python Developer",
+                url="https://hh.ru/vacancy/company-1",
+                employer="Компания А",
+                first_seen_at=utcnow(),
+            ),
+            Vacancy(
+                hh_id="company-2",
+                title="Java Developer",
+                url="https://hh.ru/vacancy/company-2",
+                employer="Компания Б",
+                first_seen_at=utcnow(),
+            ),
+            Vacancy(
+                hh_id="company-3",
+                title="Без работодателя",
+                url="https://hh.ru/vacancy/company-3",
+                employer=None,
+                first_seen_at=utcnow(),
+            ),
+        ]
+    )
+    db.commit()
+
+    resp = client.get("/vacancies")
+    assert resp.status_code == 200
+    assert '<select name="employer">' in resp.text
+    assert '<option value="Компания А" >Компания А</option>' in resp.text
+    assert '<option value="Компания Б" >Компания Б</option>' in resp.text
+
+    resp = client.get("/vacancies", params={"employer": "Компания А"})
+    assert resp.status_code == 200
+    assert "Python Developer" in resp.text
+    assert "Java Developer" not in resp.text
+    assert '<option value="Компания А" selected>Компания А</option>' in resp.text
+
+    soup = BeautifulSoup(resp.text, "html.parser")
+    company_link = soup.select_one("a.company-filter-link")
+    assert company_link is not None
+    assert parse_qs(urlparse(company_link["href"]).query) == {
+        "employer": ["Компания А"]
+    }
+    reset_link = soup.find("a", href="/vacancies", string="Сбросить фильтр")
+    assert reset_link is not None
 
 
 def test_vacancy_status(client, db):
