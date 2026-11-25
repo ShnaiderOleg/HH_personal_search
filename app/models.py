@@ -94,3 +94,20 @@ class NotificationLog(Base):
     status: Mapped[str] = mapped_column(String(20))
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class TelegramVacancyMessage(Base):
+    """Связь отправленной Telegram-карточки с вакансией."""
+
+    __tablename__ = "telegram_vacancy_messages"
+    __table_args__ = (
+        UniqueConstraint("chat_id", "message_id", name="uq_tg_vacancy_message"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    vacancy_id: Mapped[int] = mapped_column(
+        ForeignKey("vacancies.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    chat_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    message_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

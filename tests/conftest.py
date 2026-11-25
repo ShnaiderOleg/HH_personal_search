@@ -29,7 +29,13 @@ def _wipe():
     db = SessionLocal()
     try:
         for table in reversed(
-            ["notification_log", "search_vacancies", "vacancies", "searches"]
+            [
+                "telegram_vacancy_messages",
+                "notification_log",
+                "search_vacancies",
+                "vacancies",
+                "searches",
+            ]
         ):
             db.execute(text(f"DELETE FROM {table}"))
         db.commit()

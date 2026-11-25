@@ -1,15 +1,17 @@
+import asyncio
 import html
 import logging
 
 import httpx
 
 from ..config import Settings
-from ..models import Vacancy
+from ..db import SessionLocal
+from ..models import TelegramVacancyMessage, Vacancy, utcnow
 from ..services.vacancy_service import salary_label
 
 logger = logging.getLogger(__name__)
 
-_API = "https://api.telegram.org/bot{token}/sendMessage"
+_API = "https://api.telegram.org/bot{token}/{method}"
 
 
 def _card(vacancy: Vacancy) -> str:
@@ -42,7 +44,7 @@ async def send_new_vacancies_telegram(settings: Settings, vacancies: list[Vacanc
             for vacancy in vacancies:
                 try:
                     resp = await client.post(
-                        _API.format(token=settings.tg_bot_token),
+                        _API.format(token=settings.tg_bot_token, method="sendMessage"),
                         data={
                             "chat_id": chat_id,
                             "text": _card(vacancy),
@@ -51,6 +53,9 @@ async def send_new_vacancies_telegram(settings: Settings, vacancies: list[Vacanc
                         },
                     )
                     resp.raise_for_status()
+                    message_id = resp.json().get("result", {}).get("message_id")
+                    if isinstance(message_id, int):
+                        _save_message(vacancy.id, chat_id, message_id)
                     sent += 1
                 except httpx.HTTPError as exc:
                     logger.warning("telegram send to %s failed: %s", chat_id, exc)
@@ -67,7 +72,7 @@ async def send_error_alert_telegram(settings: Settings, text: str) -> int:
         for chat_id in settings.tg_chat_id_list:
             try:
                 resp = await client.post(
-                    _API.format(token=settings.tg_bot_token),
+                    _API.format(token=settings.tg_bot_token, method="sendMessage"),
                     data={
                         "chat_id": chat_id,
                         "text": body,
@@ -79,6 +84,133 @@ async def send_error_alert_telegram(settings: Settings, text: str) -> int:
             except httpx.HTTPError as exc:
                 logger.warning("telegram alert to %s failed: %s", chat_id, exc)
     return sent
+
+
+def _save_message(vacancy_id: int | None, chat_id: int, message_id: int) -> None:
+    if vacancy_id is None:
+        return
+    db = SessionLocal()
+    try:
+        exists = (
+            db.query(TelegramVacancyMessage)
+            .filter(
+                TelegramVacancyMessage.chat_id == chat_id,
+                TelegramVacancyMessage.message_id == message_id,
+            )
+            .first()
+        )
+        if not exists:
+            db.add(
+                TelegramVacancyMessage(
+                    vacancy_id=vacancy_id, chat_id=chat_id, message_id=message_id
+                )
+            )
+            db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("не удалось сохранить связь Telegram-сообщения с вакансией")
+    finally:
+        db.close()
+
+
+def process_reaction_update(settings: Settings, update: dict) -> str | None:
+    """Применяет 👍/👎 из update Telegram. Возвращает новый статус или None."""
+    reaction = update.get("message_reaction")
+    if not isinstance(reaction, dict):
+        return None
+    chat_id = reaction.get("chat", {}).get("id")
+    message_id = reaction.get("message_id")
+    if not isinstance(chat_id, int) or not isinstance(message_id, int):
+        return None
+    if chat_id not in settings.tg_chat_id_list:
+        return None
+
+    emojis = {
+        item.get("emoji")
+        for item in reaction.get("new_reaction", [])
+        if isinstance(item, dict) and item.get("type") == "emoji"
+    }
+    status = "Отклик" if "👍" in emojis else "не интересует" if "👎" in emojis else None
+    if status is None:
+        return None
+
+    db = SessionLocal()
+    try:
+        message = (
+            db.query(TelegramVacancyMessage)
+            .filter(
+                TelegramVacancyMessage.chat_id == chat_id,
+                TelegramVacancyMessage.message_id == message_id,
+            )
+            .first()
+        )
+        if message is None:
+            return None
+        vacancy = db.get(Vacancy, message.vacancy_id)
+        if vacancy is None:
+            return None
+        vacancy.status = status
+        if status == "Отклик":
+            vacancy.applied_at = utcnow()
+        db.commit()
+        logger.info("Telegram-реакция установила статус %s для вакансии %s", status, vacancy.hh_id)
+        return status
+    except Exception:
+        db.rollback()
+        logger.exception("не удалось обработать реакцию Telegram")
+        return None
+    finally:
+        db.close()
+
+
+class TelegramReactionPoller:
+    """Long-polling обновлений Telegram без публичного webhook."""
+
+    def __init__(self, settings: Settings):
+        self.settings = settings
+        self._task = None
+        self._stopping = False
+
+    def start(self) -> None:
+        if not self.settings.tg_bot_token or not self.settings.tg_chat_id_list:
+            return
+        self._task = asyncio.get_running_loop().create_task(self._run())
+
+    async def stop(self) -> None:
+        self._stopping = True
+        if self._task:
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+
+    async def _run(self) -> None:
+        offset = None
+        async with httpx.AsyncClient(timeout=40.0) as client:
+            while not self._stopping:
+                try:
+                    data = {
+                        "timeout": 30,
+                        "allowed_updates": '["message_reaction"]',
+                    }
+                    if offset is not None:
+                        data["offset"] = offset
+                    response = await client.post(
+                        _API.format(token=self.settings.tg_bot_token, method="getUpdates"),
+                        data=data,
+                    )
+                    response.raise_for_status()
+                    for update in response.json().get("result", []):
+                        update_id = update.get("update_id")
+                        if isinstance(update_id, int):
+                            offset = update_id + 1
+                        process_reaction_update(self.settings, update)
+                except asyncio.CancelledError:
+                    raise
+                except (httpx.HTTPError, ValueError) as exc:
+                    logger.warning("опрос реакций Telegram не удался: %s", exc)
+                    await asyncio.sleep(5)
 
 
 async def send_test_telegram(settings: Settings) -> int:
