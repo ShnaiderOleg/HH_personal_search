@@ -58,7 +58,9 @@ async def send_new_vacancies_telegram(settings: Settings, vacancies: list[Vacanc
                         _save_message(vacancy.id, chat_id, message_id)
                     sent += 1
                 except httpx.HTTPError as exc:
-                    logger.warning("telegram send to %s failed: %s", chat_id, exc)
+                    logger.warning(
+                        "telegram send to %s failed (%s)", chat_id, type(exc).__name__
+                    )
     return sent
 
 
@@ -82,7 +84,9 @@ async def send_error_alert_telegram(settings: Settings, text: str) -> int:
                 resp.raise_for_status()
                 sent += 1
             except httpx.HTTPError as exc:
-                logger.warning("telegram alert to %s failed: %s", chat_id, exc)
+                logger.warning(
+                    "telegram alert to %s failed (%s)", chat_id, type(exc).__name__
+                )
     return sent
 
 
@@ -163,6 +167,22 @@ def process_reaction_update(settings: Settings, update: dict) -> str | None:
         db.close()
 
 
+def _retry_after_seconds(response: httpx.Response, fallback: int) -> int:
+    """Возвращает безопасную задержку после ответа Telegram об ограничении."""
+    retry_after = None
+    try:
+        payload = response.json()
+        retry_after = payload.get("parameters", {}).get("retry_after")
+    except (TypeError, ValueError):
+        pass
+    if retry_after is None:
+        retry_after = response.headers.get("Retry-After")
+    try:
+        return max(1, min(int(retry_after), 3600))
+    except (TypeError, ValueError):
+        return fallback
+
+
 class TelegramReactionPoller:
     """Long-polling обновлений Telegram без публичного webhook."""
 
@@ -187,6 +207,7 @@ class TelegramReactionPoller:
 
     async def _run(self) -> None:
         offset = None
+        retry_delay = 5
         async with httpx.AsyncClient(timeout=40.0) as client:
             while not self._stopping:
                 try:
@@ -200,8 +221,24 @@ class TelegramReactionPoller:
                         _API.format(token=self.settings.tg_bot_token, method="getUpdates"),
                         data=data,
                     )
-                    response.raise_for_status()
-                    for update in response.json().get("result", []):
+                    if response.is_error:
+                        delay = _retry_after_seconds(response, retry_delay)
+                        logger.warning(
+                            "опрос реакций Telegram: HTTP %s; повтор через %s с",
+                            response.status_code,
+                            delay,
+                        )
+                        retry_delay = min(max(retry_delay * 2, delay), 300)
+                        await asyncio.sleep(delay)
+                        continue
+                    payload = response.json()
+                    if not payload.get("ok", False):
+                        logger.warning("опрос реакций Telegram: API отклонил запрос")
+                        await asyncio.sleep(retry_delay)
+                        retry_delay = min(retry_delay * 2, 300)
+                        continue
+                    retry_delay = 5
+                    for update in payload.get("result", []):
                         update_id = update.get("update_id")
                         if isinstance(update_id, int):
                             offset = update_id + 1
@@ -209,8 +246,13 @@ class TelegramReactionPoller:
                 except asyncio.CancelledError:
                     raise
                 except (httpx.HTTPError, ValueError) as exc:
-                    logger.warning("опрос реакций Telegram не удался: %s", exc)
-                    await asyncio.sleep(5)
+                    logger.warning(
+                        "опрос реакций Telegram не удался (%s); повтор через %s с",
+                        type(exc).__name__,
+                        retry_delay,
+                    )
+                    await asyncio.sleep(retry_delay)
+                    retry_delay = min(retry_delay * 2, 300)
 
 
 async def send_test_telegram(settings: Settings) -> int:

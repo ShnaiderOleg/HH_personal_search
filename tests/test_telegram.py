@@ -1,6 +1,8 @@
+import httpx
+
 from app.config import Settings
 from app.models import TelegramVacancyMessage, Vacancy
-from app.notifications.telegram import _card, process_reaction_update
+from app.notifications.telegram import _card, _retry_after_seconds, process_reaction_update
 
 
 def test_repeat_card_contains_previous_status():
@@ -34,7 +36,7 @@ def test_repeat_card_handles_empty_previous_status():
     assert "прошлый статус: <b>не указан</b>" in message
 
 
-def _reaction(chat_id: int, message_id: int, emoji: str, user_id: int = 1) -> dict:
+def _reaction(chat_id: int, message_id: int, emoji: str) -> dict:
     return {
         "message_reaction": {
             "chat": {"id": chat_id},
@@ -72,3 +74,19 @@ def test_thumb_down_reaction_sets_not_interested(db):
     db.refresh(vacancy)
     assert status == "не интересует"
     assert vacancy.status == "не интересует"
+
+
+def test_retry_after_prefers_telegram_parameter():
+    response = httpx.Response(
+        429,
+        headers={"Retry-After": "5"},
+        json={"parameters": {"retry_after": 42}},
+    )
+
+    assert _retry_after_seconds(response, fallback=10) == 42
+
+
+def test_retry_after_falls_back_to_backoff_for_invalid_response():
+    response = httpx.Response(502, content=b"bad gateway")
+
+    assert _retry_after_seconds(response, fallback=10) == 10
