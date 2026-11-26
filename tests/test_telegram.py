@@ -41,7 +41,7 @@ def _reaction(chat_id: int, message_id: int, emoji: str) -> dict:
         "message_reaction": {
             "chat": {"id": chat_id},
             "message_id": message_id,
-            "user": {"id": user_id},
+            "user": {"id": 1},
             "new_reaction": [{"type": "emoji", "emoji": emoji}],
         }
     }
